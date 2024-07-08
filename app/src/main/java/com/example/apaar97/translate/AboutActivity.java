@@ -15,14 +15,14 @@ public class AboutActivity extends AppCompatActivity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_about);
-        ImageView imageView = (ImageView) findViewById(R.id.about_yandex);
-        imageView.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                Uri webUri = Uri.parse(YANDEX_URL);
-                Intent webIntent = new Intent(Intent.ACTION_VIEW, webUri);
-                startActivity(webIntent);
-            }
-        });
+//        ImageView imageView = (ImageView) findViewById(R.id.about_yandex);
+//        imageView.setOnClickListener(new View.OnClickListener() {
+//            @Override
+//            public void onClick(View v) {
+//                Uri webUri = Uri.parse(YANDEX_URL);
+//                Intent webIntent = new Intent(Intent.ACTION_VIEW, webUri);
+//                startActivity(webIntent);
+//            }
+//        });
     }
 }

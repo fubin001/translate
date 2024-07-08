@@ -31,15 +31,23 @@ import android.widget.Spinner;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import java.io.UnsupportedEncodingException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Locale;
 
-import static com.example.apaar97.translate.GlobalVars.BASE_REQ_URL;
+import static com.example.apaar97.translate.GlobalVars.APP_ID;
+import static com.example.apaar97.translate.GlobalVars.BAIDU_API;
 import static com.example.apaar97.translate.GlobalVars.DEFAULT_LANG_POS;
-import static com.example.apaar97.translate.GlobalVars.LANGUAGE_CODES;
+import static com.example.apaar97.translate.GlobalVars.LANGUAGE_CODE_MAPPING;
+import static com.example.apaar97.translate.GlobalVars.LANGUAGE_ITEMS;
+import static com.example.apaar97.translate.GlobalVars.SALT;
+import static com.example.apaar97.translate.GlobalVars.SECRET;
 
-public class ConversationActivity extends AppCompatActivity implements TextToSpeech.OnInitListener{
+import org.apache.commons.codec.digest.DigestUtils;
+
+
+public class ConversationActivity extends AppCompatActivity implements TextToSpeech.OnInitListener {
 
     public static final String LOG_TAG = ConversationActivity.class.getName();
     private static final int REQ_CODE_SPEECH_INPUT_FROM = 1;
@@ -65,13 +73,11 @@ public class ConversationActivity extends AppCompatActivity implements TextToSpe
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_conversation);
 
-        activityRunning=true;
+        activityRunning = true;
         mSpinnerLanguageFrom = (Spinner) findViewById(R.id.spinner_language_from);
         mSpinnerLanguageTo = (Spinner) findViewById(R.id.spinner_language_to);
         ImageView mImageKeyboardFrom = (ImageView) findViewById(R.id.image_keyboard_from);      //      Input Keyboard button (From)
-        ImageView mImageKeyboardTo = (ImageView) findViewById(R.id.image_keyboard_to);          //      Input Keyboard button (To)
         ImageView mImageMicFrom = (ImageView) findViewById(R.id.image_mic_from);                //      Input Mic button (From)
-        ImageView mImageMicTo = (ImageView) findViewById(R.id.image_mic_to);                    //      Input Mic button (To)
         TextView mEmptyTextView = (TextView) findViewById(R.id.empty_view_not_connected);
         mListView = (ListView) findViewById(R.id.list_chat_view);
         chatArrayAdapter = new ChatArrayAdapter(getApplicationContext(), R.layout.chat_left);
@@ -81,8 +87,7 @@ public class ConversationActivity extends AppCompatActivity implements TextToSpe
         process_tts.setContentView(R.layout.dialog_processing_tts);
         process_tts.setTitle(getString(R.string.process_tts));
         TextView title = (TextView) process_tts.findViewById(android.R.id.title);
-        // title.setSingleLine(false);
-        mTextToSpeech = new TextToSpeech(this,this);
+        mTextToSpeech = new TextToSpeech(this, this);
         android.support.v7.app.ActionBar actionBar = getSupportActionBar();
         actionBar.setDisplayHomeAsUpEnabled(true);
 
@@ -93,9 +98,15 @@ public class ConversationActivity extends AppCompatActivity implements TextToSpe
             mEmptyTextView.setVisibility(View.GONE);
             mLinearLayoutKeyboardPopup.setVisibility(View.GONE);
             mListView.setAdapter(chatArrayAdapter);
-            //  GET LANGUAGES LIST
-            new GetLanguages().execute();
-            //  MIC BUTTON ACTION : SPEECH TO TEXT
+
+            ArrayAdapter<String> adapter = new ArrayAdapter<>(ConversationActivity.this, android.R.layout.simple_spinner_item, LANGUAGE_ITEMS);
+            adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+            mSpinnerLanguageFrom.setAdapter(adapter);
+            mSpinnerLanguageTo.setAdapter(adapter);
+            mSpinnerLanguageFrom.setSelection(DEFAULT_LANG_POS);
+            mSpinnerLanguageTo.setSelection(DEFAULT_LANG_POS + 1);
+
+
             mImageMicFrom.setOnClickListener(new View.OnClickListener() {
                 @Override
                 public void onClick(View v) {
@@ -110,20 +121,7 @@ public class ConversationActivity extends AppCompatActivity implements TextToSpe
                     }
                 }
             });
-            mImageMicTo.setOnClickListener(new View.OnClickListener() {
-                @Override
-                public void onClick(View v) {
-                    Intent intent = new Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH);
-                    intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM);
-                    intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE, mLanguageCodeTo);
-                    intent.putExtra(RecognizerIntent.EXTRA_PROMPT, getString(R.string.speech_prompt));
-                    try {
-                        startActivityForResult(intent, REQ_CODE_SPEECH_INPUT_TO);
-                    } catch (ActivityNotFoundException a) {
-                        Toast.makeText(getApplicationContext(), getString(R.string.language_not_supported), Toast.LENGTH_SHORT).show();
-                    }
-                }
-            });
+
             //  KEYBOARD CLICK ACTION
             mImageKeyboardFrom.setOnClickListener(new View.OnClickListener() {
                 @Override
@@ -138,7 +136,7 @@ public class ConversationActivity extends AppCompatActivity implements TextToSpe
                     imageViewSend.setOnClickListener(new View.OnClickListener() {
                         @Override
                         public void onClick(View v) {
-                            imm.hideSoftInputFromWindow(mEditTextChatKeyboardInput.getWindowToken(),0);
+                            imm.hideSoftInputFromWindow(mEditTextChatKeyboardInput.getWindowToken(), 0);
                             mLinearLayoutKeyboardPopup.setVisibility(View.GONE);
                             mChatInput = mEditTextChatKeyboardInput.getText().toString();
                             mLeftSide = true;
@@ -149,36 +147,7 @@ public class ConversationActivity extends AppCompatActivity implements TextToSpe
                     imageViewBack.setOnClickListener(new View.OnClickListener() {
                         @Override
                         public void onClick(View v) {
-                            imm.hideSoftInputFromWindow(mEditTextChatKeyboardInput.getWindowToken(),0);
-                            mLinearLayoutKeyboardPopup.setVisibility(View.GONE);
-                        }
-                    });
-                }
-            });
-            mImageKeyboardTo.setOnClickListener(new View.OnClickListener() {
-                @Override
-                public void onClick(View v) {
-                    mLinearLayoutKeyboardPopup.setVisibility(View.VISIBLE);
-                    ImageView imageViewSend = (ImageView) findViewById(R.id.image_send);
-                    ImageView imageViewBack = (ImageView) findViewById(R.id.image_back);
-                    mEditTextChatKeyboardInput.setText("");
-                    mEditTextChatKeyboardInput.requestFocus();
-                    final InputMethodManager imm = (InputMethodManager) getSystemService(Context.INPUT_METHOD_SERVICE);
-                    imm.showSoftInput(mEditTextChatKeyboardInput, InputMethodManager.SHOW_IMPLICIT);
-                    imageViewSend.setOnClickListener(new View.OnClickListener() {
-                        @Override
-                        public void onClick(View v) {
-                            imm.hideSoftInputFromWindow(mEditTextChatKeyboardInput.getWindowToken(),0);
-                            mLinearLayoutKeyboardPopup.setVisibility(View.GONE);
-                            mLeftSide = false;
-                            mChatInput = mEditTextChatKeyboardInput.getText().toString();
-                            new TranslateText().execute(mChatInput);
-                        }
-                    });
-                    imageViewBack.setOnClickListener(new View.OnClickListener() {
-                        @Override
-                        public void onClick(View v) {
-                            imm.hideSoftInputFromWindow(mEditTextChatKeyboardInput.getWindowToken(),0);
+                            imm.hideSoftInputFromWindow(mEditTextChatKeyboardInput.getWindowToken(), 0);
                             mLinearLayoutKeyboardPopup.setVisibility(View.GONE);
                         }
                     });
@@ -188,8 +157,9 @@ public class ConversationActivity extends AppCompatActivity implements TextToSpe
             mSpinnerLanguageFrom.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
                 @Override
                 public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
-                    mLanguageCodeFrom = LANGUAGE_CODES.get(position);
+                    mLanguageCodeFrom = LANGUAGE_ITEMS.get(position);
                 }
+
                 @Override
                 public void onNothingSelected(AdapterView<?> parent) {
                     Toast.makeText(getApplicationContext(), "No option selected", Toast.LENGTH_SHORT).show();
@@ -199,8 +169,9 @@ public class ConversationActivity extends AppCompatActivity implements TextToSpe
             mSpinnerLanguageTo.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
                 @Override
                 public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
-                    mLanguageCodeTo = LANGUAGE_CODES.get(position);
+                    mLanguageCodeTo = LANGUAGE_ITEMS.get(position);
                 }
+
                 @Override
                 public void onNothingSelected(AdapterView<?> parent) {
                     Toast.makeText(getApplicationContext(), "No option selected", Toast.LENGTH_SHORT).show();
@@ -222,15 +193,16 @@ public class ConversationActivity extends AppCompatActivity implements TextToSpe
                 public void onItemClick(AdapterView<?> parent, View view, int position, long id) {
                     ChatMessage chatMessage = chatArrayAdapter.getItem(position);
                     if (chatMessage != null) {
-                        speakOut(chatMessage.getmMessage(),chatMessage.getmLanguageCode());
+                        speakOut(chatMessage.getmMessage(), chatMessage.getmLanguageCode());
                     }
                 }
             });
         }
     }
+
     //  CHECK INTERNET CONNECTION
-    public  boolean isOnline()
-    {   try {
+    public boolean isOnline() {
+        try {
             ConnectivityManager connectivityManager = (ConnectivityManager) getApplicationContext().getSystemService(Context.CONNECTIVITY_SERVICE);
             NetworkInfo networkInfo = connectivityManager.getActiveNetworkInfo();
             return networkInfo != null && networkInfo.isAvailable() && networkInfo.isConnected();
@@ -239,6 +211,7 @@ public class ConversationActivity extends AppCompatActivity implements TextToSpe
         }
         return false;
     }
+
     //  RESULT OF SPEECH INPUT
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
@@ -298,12 +271,14 @@ public class ConversationActivity extends AppCompatActivity implements TextToSpe
             }
         }
     }
+
     @Override
     public boolean onCreateOptionsMenu(Menu menu) {
         MenuInflater inflater = getMenuInflater();
         inflater.inflate(R.menu.conversation_menu_clear, menu);
         return true;
     }
+
     @Override
     public boolean onOptionsItemSelected(MenuItem item) {
         switch (item.getItemId()) {
@@ -319,6 +294,7 @@ public class ConversationActivity extends AppCompatActivity implements TextToSpe
         }
         return true;
     }
+
     //  INITIALISE TEXT TO SPEECH ENGINE
     @Override
     public void onInit(int status) {
@@ -333,47 +309,52 @@ public class ConversationActivity extends AppCompatActivity implements TextToSpe
             mTextToSpeech.setOnUtteranceProgressListener(new UtteranceProgressListener() {
                 @Override
                 public void onStart(String utteranceId) {
-                    Log.e("Inside","OnStart");
+                    Log.e("Inside", "OnStart");
                     process_tts.hide();
                 }
+
                 @Override
                 public void onDone(String utteranceId) {
                 }
+
                 @Override
                 public void onError(String utteranceId) {
 
                 }
             });
         } else {
-            Log.e(LOG_TAG,"TTS Initilization Failed");
+            Log.e(LOG_TAG, "TTS Initilization Failed");
         }
     }
+
     //  TEXT TO SPEECH ACTION
     @SuppressWarnings("deprecation")
-    private void speakOut(String textMessage, String languageCode){
+    private void speakOut(String textMessage, String languageCode) {
         int result = mTextToSpeech.setLanguage(new Locale(languageCode));
-        Log.e("Inside","speakOut "+languageCode+" "+result);
-        if (result == TextToSpeech.LANG_MISSING_DATA ){
-            Toast.makeText(getApplicationContext(),getString(R.string.language_pack_missing),Toast.LENGTH_SHORT).show();
+        Log.e("Inside", "speakOut " + languageCode + " " + result);
+        if (result == TextToSpeech.LANG_MISSING_DATA) {
+            Toast.makeText(getApplicationContext(), getString(R.string.language_pack_missing), Toast.LENGTH_SHORT).show();
             Intent installIntent = new Intent();
             installIntent.setAction(TextToSpeech.Engine.ACTION_INSTALL_TTS_DATA);
             startActivity(installIntent);
-        } else if(result == TextToSpeech.LANG_NOT_SUPPORTED) {
-            Toast.makeText(getApplicationContext(),getString(R.string.language_not_supported),Toast.LENGTH_SHORT).show();
+        } else if (result == TextToSpeech.LANG_NOT_SUPPORTED) {
+            Toast.makeText(getApplicationContext(), getString(R.string.language_not_supported), Toast.LENGTH_SHORT).show();
         } else {
             process_tts.show();
             map.put(TextToSpeech.Engine.KEY_PARAM_UTTERANCE_ID, "UniqueID");
             mTextToSpeech.speak(textMessage, TextToSpeech.QUEUE_FLUSH, map);
         }
     }
+
     //  WHEN ACTIVITY IS PAUSED
     @Override
     protected void onPause() {
-        if(mTextToSpeech!=null){
+        if (mTextToSpeech != null) {
             mTextToSpeech.stop();
         }
         super.onPause();
     }
+
     //  WHEN ACTIVITY IS DESTROYED
     @Override
     public void onDestroy() {
@@ -381,78 +362,59 @@ public class ConversationActivity extends AppCompatActivity implements TextToSpe
             mTextToSpeech.stop();
             mTextToSpeech.shutdown();
         }
-        activityRunning=false;
+        activityRunning = false;
         process_tts.dismiss();
         super.onDestroy();
     }
+
     //  NEW CHAT MESSAGE
     private boolean sendChatMessage(String textTranslated) {
-        Log.e(LOG_TAG,"New chat ---------> "+mChatInput+" "+textTranslated);
-        String from,to;
-        if(mLeftSide){
-            from = mLanguageCodeFrom;
-            to = mLanguageCodeTo;
-        } else {
-            from = mLanguageCodeTo;
-            to = mLanguageCodeFrom;
-        }
-        chatArrayAdapter.add(new ChatMessage(mLeftSide,false, mChatInput,from));
-        chatArrayAdapter.add(new ChatMessage(mLeftSide,true, textTranslated,to));
+        Log.e(LOG_TAG, "New chat ---------> " + mChatInput + " " + textTranslated);
+        String from, to;
+        from = LANGUAGE_CODE_MAPPING.get(mLanguageCodeFrom);
+        to = LANGUAGE_CODE_MAPPING.get(mLanguageCodeTo);
+        chatArrayAdapter.add(new ChatMessage(mLeftSide, false, mChatInput, from));
+        chatArrayAdapter.add(new ChatMessage(mLeftSide, true, textTranslated, to));
         return true;
     }
+
     //  SUBCLASS TO TRANSLATE TEXT ON BACKGROUND THREAD
-    private class TranslateText extends AsyncTask<String,Void,String> {
+    private class TranslateText extends AsyncTask<String, Void, String> {
         @Override
         protected String doInBackground(String... input) {
             if (input[0].isEmpty()) {
                 return "";
             } else {
-                String from,to;
-                if(mLeftSide){
-                    from = mLanguageCodeFrom;
-                    to = mLanguageCodeTo;
-                } else {
-                    from = mLanguageCodeTo;
-                    to = mLanguageCodeFrom;
-                }
-                Uri baseUri = Uri.parse(BASE_REQ_URL);
+                String from, to;
+                from = LANGUAGE_CODE_MAPPING.get(mLanguageCodeFrom);
+                to = LANGUAGE_CODE_MAPPING.get(mLanguageCodeTo);
+
+                Uri baseUri = Uri.parse(BAIDU_API);
                 Uri.Builder uriBuilder = baseUri.buildUpon();
-                uriBuilder.appendPath("translate")
-                        .appendQueryParameter("key", getString(R.string.API_KEY))
-                        .appendQueryParameter("lang", from + "-" + to)
-                        .appendQueryParameter("text", input[0]);
+
+
+                String q = input[0];
+
+                String rawSign = APP_ID + q + SALT + SECRET;
+                String sign = Md5Util.md5(rawSign);
+
+
+                uriBuilder.appendQueryParameter("from", from)
+                        .appendQueryParameter("to", to)
+                        .appendQueryParameter("q", q)
+                        .appendQueryParameter("appid", APP_ID)
+                        .appendQueryParameter("salt", SALT)
+                        .appendQueryParameter("sign", sign);
+
                 Log.e("String Url ---->", uriBuilder.toString());
                 return QueryUtils.fetchTranslation(uriBuilder.toString());
             }
         }
+
         @Override
         protected void onPostExecute(String result) {
-            if(activityRunning)
-                sendChatMessage(result);
-        }
-    }
-    //  SUBCLASS TO GET LIST OF LANGUAGES ON BACKGROUND THREAD
-    private class GetLanguages extends AsyncTask<Void,Void,ArrayList<String>> {
-        @Override
-        protected ArrayList<String> doInBackground(Void... params) {
-            Uri baseUri = Uri.parse(BASE_REQ_URL);
-            Uri.Builder uriBuilder = baseUri.buildUpon();
-            uriBuilder.appendPath("getLangs")
-                    .appendQueryParameter("key",getString(R.string.API_KEY))
-                    .appendQueryParameter("ui","en");
-            Log.e("String Url ---->",uriBuilder.toString());
-            return QueryUtils.fetchLanguages(uriBuilder.toString());
-        }
-        @Override
-        protected void onPostExecute(ArrayList<String> result) {
             if (activityRunning) {
-                ArrayAdapter<String> adapter = new ArrayAdapter<>(ConversationActivity.this, android.R.layout.simple_spinner_item, result);
-                adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
-                mSpinnerLanguageFrom.setAdapter(adapter);
-                mSpinnerLanguageTo.setAdapter(adapter);
-                //  SET DEFAULT LANGUAGE SELECTIONS
-                mSpinnerLanguageFrom.setSelection(DEFAULT_LANG_POS);
-                mSpinnerLanguageTo.setSelection(DEFAULT_LANG_POS);
+                sendChatMessage(result);
             }
         }
     }

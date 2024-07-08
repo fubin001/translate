@@ -97,46 +97,6 @@
                         android:tint="@color/colorPrimary" />
                 </RelativeLayout>
             </LinearLayout>
-
-            <LinearLayout
-                android:layout_width="0dp"
-                android:layout_height="match_parent"
-                android:layout_marginLeft="2dp"
-                android:layout_weight="1"
-                android:background="@color/colorPrimary"
-                android:orientation="horizontal"
-                android:padding="8dp">
-
-                <ImageView
-                    android:id="@+id/image_keyboard_to"
-                    android:layout_width="0dp"
-                    android:layout_height="match_parent"
-                    android:layout_weight="1"
-                    android:src="@drawable/ic_keyboard_black_24dp"
-                    android:tint="@android:color/white" />
-
-                <RelativeLayout
-                    android:layout_width="0dp"
-                    android:layout_height="match_parent"
-                    android:layout_weight="1">
-
-                    <ImageView
-                        android:layout_width="match_parent"
-                        android:layout_height="match_parent"
-                        android:layout_centerInParent="true"
-                        android:src="@drawable/circle_background" />
-
-                    <ImageView
-                        android:id="@+id/image_mic_to"
-                        android:layout_width="30dp"
-                        android:layout_height="match_parent"
-                        android:layout_centerInParent="true"
-                        android:layout_weight="1"
-                        android:background="@drawable/circle_background"
-                        android:src="@drawable/ic_mic_black_24dp"
-                        android:tint="@color/colorPrimary" />
-                </RelativeLayout>
-            </LinearLayout>
         </LinearLayout>
     </LinearLayout>
 

@@ -18,7 +18,6 @@ import java.nio.charset.Charset;
 import java.util.ArrayList;
 import java.util.Iterator;
 
-import static com.example.apaar97.translate.GlobalVars.LANGUAGE_CODES;
 
 /*
         Class   :   Utility class defined to perform API requests
@@ -105,8 +104,9 @@ public class QueryUtils {
         try {
             // Create a JSONObject from the JSON response string
             JSONObject baseJsonResponse = new JSONObject(stringJSON);
-            JSONArray stringArray = baseJsonResponse.getJSONArray("text");
-            translation = stringArray.getString(0);
+            JSONArray stringArray = baseJsonResponse.getJSONArray("trans_result");
+            JSONObject translationObject = stringArray.getJSONObject(0);
+            return translationObject.getString("dst");
         } catch (JSONException e) {
             Log.e(LOG_TAG, "Problem parsing the JSON results", e);
         }
@@ -125,13 +125,11 @@ public class QueryUtils {
             JSONObject baseJsonResponse = new JSONObject(stringJSON);
             JSONObject baseJsonResponseLangs = baseJsonResponse.optJSONObject("langs");
             Iterator<String> iter = baseJsonResponseLangs.keys();
-            LANGUAGE_CODES.clear();
             while (iter.hasNext()) {
                 String key = iter.next();
                 try {
                     Object value = baseJsonResponseLangs.get(key);
                     languagesList.add(value.toString());
-                    LANGUAGE_CODES.add(key);
                 } catch (JSONException e) {
                     Log.e("QueryUtils", "Problem parsing the JSON results", e);
                 }
@@ -148,6 +146,7 @@ public class QueryUtils {
         String jsonResponse = null;
         try {
             jsonResponse = makeHttpRequest(url);
+            Log.i("json", jsonResponse);
         } catch (IOException e) {
             Log.e(LOG_TAG, "Problem making the HTTP request.", e);
         }

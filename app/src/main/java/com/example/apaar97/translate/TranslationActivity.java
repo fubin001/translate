@@ -30,9 +30,14 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Locale;
 
+import static com.example.apaar97.translate.GlobalVars.APP_ID;
+import static com.example.apaar97.translate.GlobalVars.BAIDU_API;
 import static com.example.apaar97.translate.GlobalVars.BASE_REQ_URL;
 import static com.example.apaar97.translate.GlobalVars.DEFAULT_LANG_POS;
-import static com.example.apaar97.translate.GlobalVars.LANGUAGE_CODES;
+import static com.example.apaar97.translate.GlobalVars.LANGUAGE_CODE_MAPPING;
+import static com.example.apaar97.translate.GlobalVars.LANGUAGE_ITEMS;
+import static com.example.apaar97.translate.GlobalVars.SALT;
+import static com.example.apaar97.translate.GlobalVars.SECRET;
 
 public class TranslationActivity extends AppCompatActivity implements TextToSpeech.OnInitListener{
 
@@ -75,14 +80,19 @@ public class TranslationActivity extends AppCompatActivity implements TextToSpee
         // title.setSingleLine(false);
         mTextToSpeech = new TextToSpeech(this, this);
 
+        ArrayAdapter<String> adapter = new ArrayAdapter<>(TranslationActivity.this, android.R.layout.simple_spinner_item, LANGUAGE_ITEMS);
+        adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+        mSpinnerLanguageFrom.setAdapter(adapter);
+        mSpinnerLanguageTo.setAdapter(adapter);
+        mSpinnerLanguageFrom.setSelection(DEFAULT_LANG_POS);
+        mSpinnerLanguageTo.setSelection(DEFAULT_LANG_POS + 1);
+
         //  CHECK INTERNET CONNECTION
         if (!isOnline()) {
             mEmptyTextView.setVisibility(View.VISIBLE);
         } else {
             mEmptyTextView.setVisibility(View.GONE);
             //  GET LANGUAGES LIST
-            new GetLanguages().execute();
-            //  SPEECH TO TEXT
             mImageListen.setOnClickListener(new View.OnClickListener() {
                 @Override
                 public void onClick(View v) {
@@ -141,7 +151,7 @@ public class TranslationActivity extends AppCompatActivity implements TextToSpee
             mSpinnerLanguageFrom.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
                 @Override
                 public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
-                    mLanguageCodeFrom = LANGUAGE_CODES.get(position);
+                    mLanguageCodeFrom = LANGUAGE_ITEMS.get(position);
                 }
                 @Override
                 public void onNothingSelected(AdapterView<?> parent) {
@@ -152,7 +162,7 @@ public class TranslationActivity extends AppCompatActivity implements TextToSpee
             mSpinnerLanguageTo.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
                 @Override
                 public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
-                    mLanguageCodeTo = LANGUAGE_CODES.get(position);
+                    mLanguageCodeTo = LANGUAGE_ITEMS.get(position);
                 }
                 @Override
                 public void onNothingSelected(AdapterView<?> parent) {
@@ -274,44 +284,39 @@ public class TranslationActivity extends AppCompatActivity implements TextToSpee
     private class TranslateText extends AsyncTask<String,Void,String> {
         @Override
         protected String doInBackground(String... input) {
-            Uri baseUri = Uri.parse(BASE_REQ_URL);
-            Uri.Builder uriBuilder = baseUri.buildUpon();
-            uriBuilder.appendPath("translate")
-                    .appendQueryParameter("key",getString(R.string.API_KEY))
-                    .appendQueryParameter("lang",mLanguageCodeFrom+"-"+mLanguageCodeTo)
-                    .appendQueryParameter("text",input[0]);
-            Log.e("String Url ---->",uriBuilder.toString());
-            return QueryUtils.fetchTranslation(uriBuilder.toString());
-        }
-        @Override
-        protected void onPostExecute(String result) {
-            if(activityRunning) {
-                mTextTranslated.setText(result);
+            if (input[0].isEmpty()) {
+                return "";
+            } else {
+                String from, to;
+                from = LANGUAGE_CODE_MAPPING.get(mLanguageCodeFrom);
+                to = LANGUAGE_CODE_MAPPING.get(mLanguageCodeTo);
+
+                Uri baseUri = Uri.parse(BAIDU_API);
+                Uri.Builder uriBuilder = baseUri.buildUpon();
+
+
+                String q = input[0];
+
+                String rawSign = APP_ID + q + SALT + SECRET;
+                String sign = Md5Util.md5(rawSign);
+
+
+                uriBuilder.appendQueryParameter("from", from)
+                        .appendQueryParameter("to", to)
+                        .appendQueryParameter("q", q)
+                        .appendQueryParameter("appid", APP_ID)
+                        .appendQueryParameter("salt", SALT)
+                        .appendQueryParameter("sign", sign);
+
+                Log.e("String Url ---->", uriBuilder.toString());
+                return QueryUtils.fetchTranslation(uriBuilder.toString());
             }
         }
-    }
-    //  SUBCLASS TO GET LIST OF LANGUAGES ON BACKGROUND THREAD
-    private class GetLanguages extends AsyncTask<Void,Void,ArrayList<String>>{
+
         @Override
-        protected ArrayList<String> doInBackground(Void... params) {
-            Uri baseUri = Uri.parse(BASE_REQ_URL);
-            Uri.Builder uriBuilder = baseUri.buildUpon();
-            uriBuilder.appendPath("getLangs")
-                    .appendQueryParameter("key",getString(R.string.API_KEY))
-                    .appendQueryParameter("ui","en");
-            Log.e("String Url ---->",uriBuilder.toString());
-            return QueryUtils.fetchLanguages(uriBuilder.toString());
-        }
-        @Override
-        protected void onPostExecute(ArrayList<String> result) {
+        protected void onPostExecute(String result) {
             if (activityRunning) {
-                ArrayAdapter<String> adapter = new ArrayAdapter<>(TranslationActivity.this, android.R.layout.simple_spinner_item, result);
-                adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
-                mSpinnerLanguageFrom.setAdapter(adapter);
-                mSpinnerLanguageTo.setAdapter(adapter);
-                //  SET DEFAULT LANGUAGE SELECTIONS
-                mSpinnerLanguageFrom.setSelection(DEFAULT_LANG_POS);
-                mSpinnerLanguageTo.setSelection(DEFAULT_LANG_POS);
+                mTextTranslated.setText(result);
             }
         }
     }
